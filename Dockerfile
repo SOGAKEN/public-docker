@@ -1,27 +1,25 @@
-# フロントエンドのビルド
-FROM node:14 AS frontend-builder
+FROM golang:1.22.0-alpine as backend
+WORKDIR /app/backend
+COPY backend/go.mod .
+COPY backend/go.sum .
+RUN go mod download
+COPY backend/ .
+RUN go build -o main
+
+FROM node:18-alpine as frontend
 WORKDIR /app/frontend
-COPY frontend/package.json ./
+COPY frontend/package.json .
+COPY frontend/package-lock.json .
 RUN npm install
-COPY frontend ./
+COPY frontend/ .
 RUN npm run build
 
-# バックエンドのビルド
-FROM golang:1.16 AS backend-builder
-WORKDIR /app/backend
-COPY backend/go.mod ./
-RUN go mod download
-COPY backend ./
-RUN CGO_ENABLED=0 GOOS=linux go build -o main
-
-# 最終イメージ
-FROM golang:1.16
+FROM node:18-alpine
 WORKDIR /app
-COPY --from=backend-builder /app/backend/main ./
-COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
-COPY --from=frontend-builder /app/frontend/public ./frontend/public
-
-# .envファイルをコピー
-COPY .env ./
-
-CMD ["./main"]
+COPY --from=backend /app/backend/main .
+COPY --from=frontend /app/frontend/.next ./frontend/.next
+COPY --from=frontend /app/frontend/node_modules ./frontend/node_modules
+COPY --from=frontend /app/frontend/package.json ./frontend/package.json
+COPY --from=frontend /app/frontend/public ./frontend/public
+EXPOSE 3000
+CMD ["sh", "-c", "./main & cd frontend && npm run dev"]
