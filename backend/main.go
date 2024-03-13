@@ -4,8 +4,6 @@ import (
 	"backend/handlers"
 	"fmt"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 
 	"github.com/gin-contrib/cors"
@@ -23,9 +21,10 @@ func main() {
 		panic("Error loading .env file")
 	}
 	r := gin.Default()
+	orgin := os.Getenv("AUTH_URL")
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:8080"}
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowOrigins = []string{orgin}
+	config.AllowMethods = []string{"GET", "POST"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	config.AllowCredentials = true
 
@@ -68,12 +67,5 @@ func main() {
 		}
 	})
 
-	// NextJSアプリケーションへのリバースプロキシを設定
-	r.NoRoute(func(c *gin.Context) {
-		target, _ := url.Parse("http://localhost:8080")
-		proxy := httputil.NewSingleHostReverseProxy(target)
-		proxy.ServeHTTP(c.Writer, c.Request)
-	})
-
-	r.Run(":8081")
+	r.Run(":8080")
 }
