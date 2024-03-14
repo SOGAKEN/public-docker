@@ -110,9 +110,19 @@ const SummaryPage = () => {
 			Response: response.openai?.content || "",
 		}));
 
-		const csv = Papa.unparse(data);
-		const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-		saveAs(blob, "summary.csv");
+		const csv = Papa.unparse(data, { delimiter: "," });
+		const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
+
+		// 現在の日時を取得
+		const now = new Date();
+		const timestamp = `${now.getFullYear()}${padZero(now.getMonth() + 1)}${padZero(now.getDate())}${padZero(now.getHours())}${padZero(now.getMinutes())}${padZero(now.getSeconds())}`;
+
+		saveAs(blob, `summary_${timestamp}.csv`);
+	};
+
+	// ゼロパディング用のヘルパー関数
+	const padZero = (num: number) => {
+		return num.toString().padStart(2, "0");
 	};
 
 	return (
