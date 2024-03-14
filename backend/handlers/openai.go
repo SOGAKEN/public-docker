@@ -42,6 +42,7 @@ type OpenAIResponse struct {
 		Param   string `json:"param"`
 		Code    string `json:"code"`
 	} `json:"error"`
+	RequestModel string `json:"request_model"`
 }
 
 func HandleOpenAI(c *gin.Context, data []interface{}) {
@@ -125,6 +126,7 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 			}
 
 			var openaiResp OpenAIResponse
+			openaiResp.RequestModel = openaiReq.Model
 			err = json.Unmarshal(body, &openaiResp)
 			if err != nil {
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": "Error unmarshaling OpenAI response: " + err.Error(), "openai_response": string(body)})
@@ -141,7 +143,10 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 				return
 			}
 
-			newC.JSON(http.StatusOK, gin.H{"openai": openaiResp.Choices[0].Message})
+			newC.JSON(http.StatusOK, gin.H{
+				"openai": openaiResp.Choices[0].Message,
+				"model":  openaiResp.RequestModel,
+			})
 		}(v)
 	}
 

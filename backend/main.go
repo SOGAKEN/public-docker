@@ -45,7 +45,7 @@ func main() {
 
 	r.POST("/api/login", handlers.Login)
 
-	r.POST("/api", func(c *gin.Context) {
+	r.POST("/api/summary", func(c *gin.Context) {
 		var body RequestBody
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
