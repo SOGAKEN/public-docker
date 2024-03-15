@@ -8,3 +8,8 @@ import (
 type APIHandler interface {
 	HandleRequest(c *gin.Context, requestData interface{}) (interface{}, error)
 }
+
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}

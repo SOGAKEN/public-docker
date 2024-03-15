@@ -60,12 +60,7 @@ const SummaryPage = () => {
 											{
 												role: "system",
 												content:
-													"あなたは優秀な教師です。",
-											},
-											{
-												role: "user",
-												content:
-													"下記文章を要約してください。",
+													"あなたは優秀な教師です。下記文章を要約してください。",
 											},
 											{ role: "user", content: content },
 										],

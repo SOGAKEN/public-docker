@@ -16,11 +16,6 @@ type OpenAIRequest struct {
 	Messages []Message `json:"messages"`
 }
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 type OpenAIResponse struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`

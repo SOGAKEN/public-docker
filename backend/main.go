@@ -60,6 +60,8 @@ func main() {
 				handlers.HandleGoogle(c, value)
 			case "azure":
 				handlers.HandleAzure(c, value)
+			case "anthropic":
+				handlers.HandleClaude(c, value)
 			default:
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid API key"})
 				return
