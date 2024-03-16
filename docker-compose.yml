@@ -1,11 +1,14 @@
 version: '3.8'
+
 services:
-  app:
-    build: .
+  backend:
+    build: ./backend
     ports:
-      - "8080:8080" # Next.js フロントエンド 
-      - "8081:8081" # Gin バックエンド
-    volumes:
-      - ./frontend:/app/frontend
-      - ./backend:/app/backend
-      - ./.env:/app/.env
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

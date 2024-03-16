@@ -1,133 +1,140 @@
-// frontend/app/summary/page.tsx
 "use client";
 
-import { useState } from "react";
-
-interface OpenAIResponse {
-	role: string;
-	content: string;
-}
-
-interface Response {
-	openai?: OpenAIResponse;
-	// Google and Azure response types
-}
+import React, { useState } from "react";
+import { saveAs } from "file-saver";
+import Papa from "papaparse";
+import { Provider, Response } from "./../../types";
+import SideMenu from "./components/SideMenu";
+import MainContent from "./components/MainContent";
 
 const SummaryPage = () => {
-	const [provider, setProvider] = useState("openai");
-	const [model, setModel] = useState("gpt-3.5-turbo");
+	const [selectedModels, setSelectedModels] = useState<{
+		[key: string]: string[];
+	}>({});
 	const [content, setContent] = useState("");
-	const [response, setResponse] = useState<Response | null>(null);
+	const [responses, setResponses] = useState<Response[]>([]);
+	const [isLoading, setIsLoading] = useState(false);
+
+	const url = process.env.NEXT_PUBLIC_URL;
+	const providers: Provider[] = JSON.parse(
+		process.env.NEXT_PUBLIC_PROVIDERS || "[]"
+	);
+
+	const handleModelChange = (provider: string, model: string) => {
+		if (selectedModels[provider]?.includes(model)) {
+			setSelectedModels({
+				...selectedModels,
+				[provider]: selectedModels[provider].filter((m) => m !== model),
+			});
+		} else {
+			setSelectedModels({
+				...selectedModels,
+				[provider]: [...(selectedModels[provider] || []), model],
+			});
+		}
+	};
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 
-		const data = {
-			data: {
-				[provider]: [
-					{
-						model: model,
-						messages: [
-							{ role: "system", content: "あなたは優秀な教師です。" },
-							{ role: "user", content: "下記文章を要約してください。" },
-							{ role: "user", content: content },
-						],
-					},
-					{
-						model: model,
-						messages: [
-							{ role: "system", content: "あなたは優秀な教師です。" },
-							{ role: "user", content: "下記文章を英語にしてください。" },
-							{ role: "user", content: content },
-						],
-					},
-				],
-			},
-		};
+		// チェックボックスが選択されているかどうかを確認
+		const isModelSelected = Object.values(selectedModels).some((models) => models.length > 0);
+
+		if (!isModelSelected) {
+			alert("左メニューよりチェックボックスにチェックを入れてください。");
+			return;
+		}
+
+		setIsLoading(true);
 
 		try {
-			const res = await fetch("/api", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(data),
-			});
+			const promises = Object.entries(selectedModels).flatMap(
+				([provider, models]) =>
+					models.map(async (model) => {
+						const data = {
+							data: {
+								[provider]: [
+									{
+										model: model,
+										messages: [
+											{
+												role: "system",
+												content:
+													"あなたは優秀な教師です。下記文章を要約してください。",
+											},
+											{ role: "user", content: content },
+										],
+									},
+								],
+							},
+						};
 
-			if (res.ok) {
-				const result: Response = await res.json();
-				setResponse(result);
-			} else {
-				console.error("Request failed");
-			}
+						const res = await fetch(`${url}/api/summary`, {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+							},
+							body: JSON.stringify(data),
+						});
+
+						if (res.ok) {
+							const result: Response = await res.json();
+							return result;
+						} else {
+							console.error("Request failed");
+							return null;
+						}
+					})
+			);
+
+			const results = await Promise.all(promises);
+			setResponses(
+				results.filter((result): result is Response => result !== null)
+			);
 		} catch (error) {
 			console.error("An error occurred", error);
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
+	const exportToCsv = () => {
+		const data = responses.map((response) => ({
+			Request: content,
+			Model: response.model || "",
+			Response: response.openai?.content || "",
+		}));
+
+		const csv = Papa.unparse(data, { delimiter: "," });
+		const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
+
+		// 現在の日時を取得
+		const now = new Date();
+		const timestamp = `${now.getFullYear()}${padZero(now.getMonth() + 1)}${padZero(now.getDate())}${padZero(now.getHours())}${padZero(now.getMinutes())}${padZero(now.getSeconds())}`;
+
+		saveAs(blob, `summary_${timestamp}.csv`);
+	};
+
+	// ゼロパディング用のヘルパー関数
+	const padZero = (num: number) => {
+		return num.toString().padStart(2, "0");
+	};
+
 	return (
-		<div className="container mx-auto px-4 py-8">
-			<h1 className="text-3xl font-bold mb-4">Summary Page</h1>
-			<form onSubmit={handleSubmit} className="max-w-md mx-auto">
-				<div className="mb-4">
-					<label className="block text-gray-700 font-bold mb-2">
-						Provider:
-						<select
-							value={provider}
-							onChange={(e) => setProvider(e.target.value)}
-							className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-						>
-							<option value="openai">OpenAI</option>
-							<option value="google">Google</option>
-							<option value="azure">Azure</option>
-						</select>
-					</label>
-				</div>
-				<div className="mb-4">
-					<label className="block text-gray-700 font-bold mb-2">
-						Model:
-						<select
-							value={model}
-							onChange={(e) => setModel(e.target.value)}
-							className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-						>
-							<option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-							<option value="gpt-4">gpt-4</option>
-						</select>
-					</label>
-				</div>
-				<div className="mb-4">
-					<label className="block text-gray-700 font-bold mb-2">
-						Content:
-						<textarea
-							value={content}
-							onChange={(e) => setContent(e.target.value)}
-							className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-							rows={5}
-						/>
-					</label>
-				</div>
-				<button
-					type="submit"
-					className="px-4 py-2 font-bold text-white bg-indigo-500 rounded-md hover:bg-indigo-700 focus:outline-none focus:shadow-outline"
-				>
-					Submit
-				</button>
-			</form>
-			{response && (
-				<div className="mt-8">
-					<h2 className="text-xl font-bold mb-2">Response:</h2>
-					{provider === "openai" && response.openai && (
-						<div className="bg-gray-100 p-4 rounded-md">
-							<p className="text-lg font-semibold mb-2">Role:</p>
-							<p>{response.openai.role}</p>
-							<p className="text-lg font-semibold mt-4 mb-2">Content:</p>
-							<p>{response.openai.content}</p>
-						</div>
-					)}
-					{/* Google and Azure response handling */}
-				</div>
-			)}
+		<div className="flex h-screen">
+			<SideMenu
+				providers={providers}
+				selectedModels={selectedModels}
+				onModelChange={handleModelChange}
+			/>
+			<MainContent
+				content={content}
+				responses={responses}
+				onContentChange={(e) => setContent(e.target.value)}
+				onSubmit={handleSubmit}
+				onExportCsv={exportToCsv}
+				isLoading={isLoading}
+			/>
 		</div>
 	);
 };
