@@ -32,7 +32,7 @@ func Login(c *gin.Context) {
 	if loginReq.Username == username && loginReq.Password == password {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"username": username,
-			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+			"exp":      time.Now().Add(time.Hour * 8).Unix(),
 		})
 
 		tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
@@ -41,10 +41,10 @@ func Login(c *gin.Context) {
 			return
 		}
 
-		c.SetCookie("token", tokenString, 86400, "/", "localhost", false, true)
+		c.SetCookie("token", tokenString, 60*60*8, "/", "localhost", false, true)
 		c.JSON(http.StatusOK, gin.H{
 			"token":     tokenString,
-			"expiresIn": 86400,
+			"expiresIn": 60 * 60 * 8,
 		})
 	} else {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})

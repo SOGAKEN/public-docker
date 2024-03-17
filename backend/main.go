@@ -52,6 +52,8 @@ func main() {
 			return
 		}
 
+		fmt.Println("kitayo")
+
 		for key, value := range body.Data {
 			switch key {
 			case "openai":
