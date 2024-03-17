@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/api/option"
 )
 
 type VertexAIResponse struct {
@@ -73,7 +74,14 @@ func HandleGoogle(c *gin.Context, data []interface{}) {
 
 func makeChatRequests(projectId, region, modelName, content string) ([]genai.Part, error) {
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, projectId, region)
+
+	credsJSON := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+	var opts []option.ClientOption
+	if credsJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(credsJSON)))
+	}
+
+	client, err := genai.NewClient(ctx, projectId, region, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
@@ -89,9 +97,7 @@ func makeChatRequests(projectId, region, modelName, content string) ([]genai.Par
 	var parts []genai.Part
 	for _, cand := range resp.Candidates {
 		for _, part := range cand.Content.Parts {
-			fmt.Println(part)
 			parts = append(parts, part)
-
 		}
 	}
 

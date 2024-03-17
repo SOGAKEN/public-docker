@@ -3,6 +3,7 @@ package main
 import (
 	"backend/handlers"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -20,6 +21,26 @@ func main() {
 	if err != nil {
 		panic("Error loading .env file")
 	}
+
+	creds := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+	if creds != "" {
+		tmpfile, err := os.CreateTemp("", "gcp-creds-*.json")
+		if err != nil {
+			fmt.Println("Failed to create temp file for credentials", err)
+			return
+		}
+		if _, err := io.WriteString(tmpfile, creds); err != nil {
+			fmt.Println("Failed to write to temp credentials file", err)
+			return
+		}
+		if err := tmpfile.Close(); err != nil {
+			fmt.Println("Failed to close temp credentials file", err)
+			return
+		}
+		// 環境変数 GOOGLE_APPLICATION_CREDENTIALS を一時ファイルに設定
+		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tmpfile.Name())
+	}
+
 	r := gin.Default()
 	orgin := os.Getenv("AUTH_URL")
 	config := cors.DefaultConfig()
@@ -51,8 +72,6 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-		fmt.Println("kitayo")
 
 		for key, value := range body.Data {
 			switch key {
