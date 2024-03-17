@@ -81,7 +81,7 @@ func makeChatRequests(projectId, region, modelName, content string) ([]genai.Par
 
 	model := client.GenerativeModel(modelName)
 	model.SetTemperature(0.9)
-	resp, err := model.GenerateContent(ctx, genai.Text(content))
+	resp, err := model.GenerateContent(ctx, genai.Text("Provide a summary for the following article: "+content))
 	if err != nil {
 		return nil, err
 	}
