@@ -1,12 +1,12 @@
-export type OpenAIResponse = {
+export type AIResponse = {
 	role: string;
 	content: string;
 };
 
 export type Response = {
-	openai?: OpenAIResponse;
+	openai?: AIResponse;
+	google?: AIResponse;
 	model?: string;
-	google?: OpenAIResponse;
 	// Google and Azure response types
 };
 

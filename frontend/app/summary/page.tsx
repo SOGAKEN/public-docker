@@ -102,7 +102,7 @@ const SummaryPage = () => {
 		const data = responses.map((response) => ({
 			Request: content,
 			Model: response.model || "",
-			Response: response.openai?.content || "",
+			Response: response.openai?.content || response.google?.content || "",
 		}));
 
 		const csv = Papa.unparse(data, { delimiter: "," });
