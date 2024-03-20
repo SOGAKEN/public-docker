@@ -2,10 +2,12 @@ package main
 
 import (
 	"backend/handlers"
+	"backend/middleware"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -42,9 +44,9 @@ func main() {
 	}
 
 	r := gin.Default()
-	orgin := os.Getenv("AUTH_URL")
+	origins := strings.Split(os.Getenv("AUTH_URL"), ",")
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{orgin}
+	config.AllowOrigins = origins
 	config.AllowMethods = []string{"GET", "POST"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	config.AllowCredentials = true
@@ -65,7 +67,10 @@ func main() {
 	})
 
 	r.POST("/api/login", handlers.Login)
-	r.POST("/api/summary", handlers.HandleSummary)
+
+	protected := r.Group("/")
+	protected.Use(middleware.AuthMiddleware())
+	protected.POST("/api/summary", handlers.HandleSummary)
 
 	r.Run(":8080")
 }
