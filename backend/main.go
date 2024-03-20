@@ -65,30 +65,7 @@ func main() {
 	})
 
 	r.POST("/api/login", handlers.Login)
-
-	r.POST("/api/summary", func(c *gin.Context) {
-		var body RequestBody
-		if err := c.ShouldBindJSON(&body); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		for key, value := range body.Data {
-			switch key {
-			case "openai":
-				handlers.HandleOpenAI(c, value)
-			case "google":
-				handlers.HandleGoogle(c, value)
-			case "azure":
-				handlers.HandleAzure(c, value)
-			case "anthropic":
-				handlers.HandleClaude(c, value)
-			default:
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid API key"})
-				return
-			}
-		}
-	})
+	r.POST("/api/summary", handlers.HandleSummary)
 
 	r.Run(":8080")
 }
