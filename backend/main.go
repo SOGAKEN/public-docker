@@ -5,7 +5,6 @@ import (
 	"backend/middleware"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 
@@ -53,18 +52,18 @@ func main() {
 
 	r.Use(cors.New(config))
 
-	username := os.Getenv("BASIC_AUTH_USER")
-	password := os.Getenv("BASIC_AUTH_PASS")
-
-	fmt.Println(username, password)
-
-	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-		username: password,
-	}))
-
-	authorized.POST("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "認証済み"})
-	})
+	// username := os.Getenv("BASIC_AUTH_USER")
+	// password := os.Getenv("BASIC_AUTH_PASS")
+	//
+	// fmt.Println(username, password)
+	//
+	// authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
+	// 	username: password,
+	// }))
+	//
+	// authorized.POST("/", func(c *gin.Context) {
+	// 	c.JSON(http.StatusOK, gin.H{"message": "認証済み"})
+	// })
 
 	r.POST("/api/login", handlers.Login)
 

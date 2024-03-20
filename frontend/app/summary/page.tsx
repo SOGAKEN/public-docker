@@ -69,10 +69,13 @@ const SummaryPage = () => {
 							},
 						};
 
+						// const token = localStorage.getItem("token");
+
 						const res = await fetch(`${url}/api/summary`, {
 							method: "POST",
 							headers: {
 								"Content-Type": "application/json",
+								Authorization: `Bearer sksksk`,
 							},
 							body: JSON.stringify(data),
 						});
