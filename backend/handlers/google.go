@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -19,14 +20,16 @@ type VertexAIResponse struct {
 	} `json:"Candidates"`
 }
 
-func HandleGoogle(c *gin.Context, data []interface{}) {
+func HandleGoogle(logger *log.Logger, c *gin.Context, data []interface{}) {
 	if len(data) < 1 {
+		logger.Printf("No data provided")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No data provided"})
 		return
 	}
 
 	firstData, ok := data[0].(map[string]interface{})
 	if !ok {
+		logger.Printf("Invalid data format: %v", data[0])
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid data format"})
 		return
 	}
@@ -34,22 +37,26 @@ func HandleGoogle(c *gin.Context, data []interface{}) {
 	modelName, modelOk := firstData["model"].(string)
 	messages, messagesOk := firstData["messages"].([]interface{})
 	if !modelOk || !messagesOk {
+		logger.Printf("Invalid data structure: %v", firstData)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid data structure"})
 		return
 	}
 	if len(messages) < 1 {
+		logger.Printf("No messages provided")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No messages provided"})
 		return
 	}
 
 	message, ok := messages[len(messages)-1].(map[string]interface{})
 	if !ok {
+		logger.Printf("Invalid message format: %v", messages[len(messages)-1])
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
 		return
 	}
 
 	content, contentOk := message["content"].(string)
 	if !contentOk {
+		logger.Printf("Invalid message content: %v", message)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message content"})
 		return
 	}
@@ -57,8 +64,9 @@ func HandleGoogle(c *gin.Context, data []interface{}) {
 	projectId := os.Getenv("PROJECT_ID")
 	region := os.Getenv("REGION")
 
-	parts, err := makeChatRequests(projectId, region, modelName, content)
+	parts, err := makeChatRequests(logger, projectId, region, modelName, content)
 	if err != nil {
+		logger.Printf("Error making chat requests: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -72,7 +80,7 @@ func HandleGoogle(c *gin.Context, data []interface{}) {
 	})
 }
 
-func makeChatRequests(projectId, region, modelName, content string) ([]genai.Part, error) {
+func makeChatRequests(logger *log.Logger, projectId, region, modelName, content string) ([]genai.Part, error) {
 	ctx := context.Background()
 
 	credsJSON := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -83,6 +91,7 @@ func makeChatRequests(projectId, region, modelName, content string) ([]genai.Par
 
 	client, err := genai.NewClient(ctx, projectId, region, opts...)
 	if err != nil {
+		logger.Printf("Error creating client: %v", err)
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
 	defer client.Close()
@@ -91,7 +100,8 @@ func makeChatRequests(projectId, region, modelName, content string) ([]genai.Par
 	model.SetTemperature(0.9)
 	resp, err := model.GenerateContent(ctx, genai.Text("Provide a summary for the following article: "+content))
 	if err != nil {
-		return nil, err
+		logger.Printf("Error generating content: %v", err)
+		return nil, fmt.Errorf("error generating content: %v", err)
 	}
 
 	var parts []genai.Part

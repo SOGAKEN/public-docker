@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -40,14 +41,16 @@ type Usage struct {
 	OutputTokens int `json:"output_tokens"`
 }
 
-func HandleClaude(c *gin.Context, data []interface{}) {
+func HandleClaude(logger *log.Logger, c *gin.Context, data []interface{}) {
 	if len(data) == 0 {
+		logger.Printf("Empty 'anthropic' data in the request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty 'anthropic' data in the request"})
 		return
 	}
 
 	req, ok := data[0].(map[string]interface{})
 	if !ok {
+		logger.Printf("Invalid Claude request format: %v", data[0])
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Claude request format"})
 		return
 	}
@@ -57,11 +60,13 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 
 	messages, ok := req["messages"].([]interface{})
 	if !ok {
+		logger.Printf("Invalid messages format: %v", req["messages"])
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid messages format"})
 		return
 	}
 
 	if len(messages) == 0 {
+		logger.Printf("Empty messages in the request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty messages in the request"})
 		return
 	}
@@ -70,12 +75,14 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 	for _, msg := range messages {
 		msgMap, ok := msg.(map[string]interface{})
 		if !ok {
+			logger.Printf("Invalid message format: %v", msg)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
 			return
 		}
 
 		content, contentOk := msgMap["content"].(string)
 		if !contentOk {
+			logger.Printf("Invalid message format: %v", msgMap)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
 			return
 		}
@@ -87,7 +94,6 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 
 	claudeReq.Messages = append(claudeReq.Messages, Message{Role: "user", Content: combinedContent})
 
-	// AWS SDKの設定
 	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(os.Getenv("AWS_REGION")),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -97,20 +103,18 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 		)),
 	)
 	if err != nil {
+		logger.Printf("Error loading AWS config: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// AWS Bedrockランタイムのクライアントを初期化
 	brc := bedrockruntime.NewFromConfig(cfg)
 
-	// anthropic_versionを環境変数から取得
 	anthropicVersion := os.Getenv("ANTHROPIC_VERSION")
 	if anthropicVersion == "" {
-		anthropicVersion = "bedrock-2023-05-31" // デフォルト値
+		anthropicVersion = "bedrock-2023-05-31"
 	}
 
-	// APIリクエストの作成
 	message := bedrockruntime.InvokeModelInput{
 		ModelId: aws.String("anthropic." + claudeReq.Model),
 		Body: func() []byte {
@@ -125,13 +129,12 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 		ContentType: aws.String("application/json"),
 	}
 
-	// タイムアウト設定付きのコンテキストを作成
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// APIリクエストの送信
 	output, err := brc.InvokeModel(ctx, &message)
 	if err != nil {
+		logger.Printf("Error invoking Claude model: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -139,6 +142,7 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 	var claudeResp ClaudeResponse
 	err = json.Unmarshal(output.Body, &claudeResp)
 	if err != nil {
+		logger.Printf("Error unmarshaling Claude response: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error unmarshaling Claude response: " + err.Error(), "claude_response": string(output.Body)})
 		return
 	}

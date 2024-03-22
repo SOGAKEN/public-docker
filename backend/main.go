@@ -5,6 +5,7 @@ import (
 	"backend/middleware"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -38,9 +39,17 @@ func main() {
 			fmt.Println("Failed to close temp credentials file", err)
 			return
 		}
-		// 環境変数 GOOGLE_APPLICATION_CREDENTIALS を一時ファイルに設定
 		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tmpfile.Name())
 	}
+
+	// ロガーの設定
+	logFile, err := os.OpenFile("application.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logFile.Close()
+
+	logger := log.New(logFile, "", log.LstdFlags)
 
 	r := gin.Default()
 	origins := strings.Split(os.Getenv("AUTH_URL"), ",")
@@ -52,24 +61,11 @@ func main() {
 
 	r.Use(cors.New(config))
 
-	// username := os.Getenv("BASIC_AUTH_USER")
-	// password := os.Getenv("BASIC_AUTH_PASS")
-	//
-	// fmt.Println(username, password)
-	//
-	// authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-	// 	username: password,
-	// }))
-	//
-	// authorized.POST("/", func(c *gin.Context) {
-	// 	c.JSON(http.StatusOK, gin.H{"message": "認証済み"})
-	// })
-
-	r.POST("/api/login", handlers.Login)
+	r.POST("/api/login", handlers.LoginHandler(logger))
 
 	protected := r.Group("/")
-	protected.Use(middleware.AuthMiddleware())
-	protected.POST("/api/summary", handlers.HandleSummary)
+	protected.Use(middleware.AuthMiddleware(logger))
+	protected.POST("/api/summary", handlers.HandleSummary(logger))
 
 	r.Run(":8080")
 }

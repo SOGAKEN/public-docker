@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -40,7 +41,7 @@ type OpenAIResponse struct {
 	RequestModel string `json:"request_model"`
 }
 
-func HandleOpenAI(c *gin.Context, data []interface{}) {
+func HandleOpenAI(logger *log.Logger, c *gin.Context, data []interface{}) {
 	var wg sync.WaitGroup
 	wg.Add(len(data))
 
@@ -48,13 +49,13 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 		go func(v interface{}) {
 			defer wg.Done()
 
-			// 新しいGinコンテキストを作成
 			newC := gin.Context{}
 			newC.Request = c.Request.Clone(c.Request.Context())
 			newC.Writer = &ResponseWriterMock{ResponseWriter: c.Writer, body: &bytes.Buffer{}}
 
 			req, ok := v.(map[string]interface{})
 			if !ok {
+				logger.Printf("Invalid OpenAI request: %v", v)
 				newC.JSON(http.StatusBadRequest, gin.H{"error": "Invalid OpenAI request"})
 				return
 			}
@@ -64,6 +65,7 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 
 			messages, ok := req["messages"].([]interface{})
 			if !ok {
+				logger.Printf("Invalid messages format: %v", req["messages"])
 				newC.JSON(http.StatusBadRequest, gin.H{"error": "Invalid messages format"})
 				return
 			}
@@ -71,6 +73,7 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 			for _, msg := range messages {
 				msgMap, ok := msg.(map[string]interface{})
 				if !ok {
+					logger.Printf("Invalid message format: %v", msg)
 					newC.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
 					return
 				}
@@ -78,6 +81,7 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 				role, roleOk := msgMap["role"].(string)
 				content, contentOk := msgMap["content"].(string)
 				if !roleOk || !contentOk {
+					logger.Printf("Invalid message format: %v", msgMap)
 					newC.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
 					return
 				}
@@ -87,18 +91,21 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 
 			jsonReq, err := json.Marshal(openaiReq)
 			if err != nil {
+				logger.Printf("Error creating OpenAI request: %v", err)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
 			apiKey := os.Getenv("OPENAI_API_KEY")
 			if apiKey == "" {
+				logger.Printf("OPENAI_API_KEY environment variable not set")
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": "OPENAI_API_KEY environment variable not set"})
 				return
 			}
 
 			httpReq, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonReq))
 			if err != nil {
+				logger.Printf("Error creating OpenAI request: %v", err)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
@@ -109,6 +116,7 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 			client := &http.Client{}
 			resp, err := client.Do(httpReq)
 			if err != nil {
+				logger.Printf("Error sending OpenAI request: %v", err)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
@@ -116,6 +124,7 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
+				logger.Printf("Error reading OpenAI response body: %v", err)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
@@ -124,16 +133,19 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 			openaiResp.RequestModel = openaiReq.Model
 			err = json.Unmarshal(body, &openaiResp)
 			if err != nil {
+				logger.Printf("Error unmarshaling OpenAI response: %v", err)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": "Error unmarshaling OpenAI response: " + err.Error(), "openai_response": string(body)})
 				return
 			}
 
 			if openaiResp.Error.Message != "" {
+				logger.Printf("OpenAI API error: %v", openaiResp.Error)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": openaiResp.Error.Message, "openai_response": openaiResp})
 				return
 			}
 
 			if len(openaiResp.Choices) == 0 {
+				logger.Printf("No choices in OpenAI response: %v", openaiResp)
 				newC.JSON(http.StatusInternalServerError, gin.H{"error": "No choices in OpenAI response", "openai_response": openaiResp})
 				return
 			}
@@ -148,7 +160,6 @@ func HandleOpenAI(c *gin.Context, data []interface{}) {
 	wg.Wait()
 }
 
-// gin.ResponseWriterをモックする構造体
 type ResponseWriterMock struct {
 	gin.ResponseWriter
 	body *bytes.Buffer

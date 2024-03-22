@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -19,34 +20,37 @@ type LoginResponse struct {
 	ExpiresIn int    `json:"expiresIn"`
 }
 
-func Login(c *gin.Context) {
-	var loginReq LoginRequest
-	if err := c.ShouldBindJSON(&loginReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	username := os.Getenv("BASIC_AUTH_USER")
-	password := os.Getenv("BASIC_AUTH_PASS")
-
-	if loginReq.Username == username && loginReq.Password == password {
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"username": username,
-			"exp":      time.Now().Add(time.Hour * 8).Unix(),
-		})
-
-		tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+func LoginHandler(logger *log.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var loginReq LoginRequest
+		if err := c.ShouldBindJSON(&loginReq); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.SetCookie("token", tokenString, 60*60*8, "/", "localhost", false, true)
-		c.JSON(http.StatusOK, gin.H{
-			"token":     tokenString,
-			"expiresIn": 60 * 60 * 8,
-		})
-	} else {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		username := os.Getenv("BASIC_AUTH_USER")
+		password := os.Getenv("BASIC_AUTH_PASS")
+
+		if loginReq.Username == username && loginReq.Password == password {
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+				"username": username,
+				"exp":      time.Now().Add(time.Hour * 8).Unix(),
+			})
+
+			tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+				return
+			}
+
+			c.SetCookie("token", tokenString, 60*60*8, "/", "localhost", false, true)
+			c.JSON(http.StatusOK, gin.H{
+				"token":     tokenString,
+				"expiresIn": 60 * 60 * 8,
+			})
+		} else {
+			logger.Printf("Invalid login attempt: username=%s", loginReq.Username)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		}
 	}
 }
