@@ -42,8 +42,17 @@ func main() {
 		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tmpfile.Name())
 	}
 
+	logFilePath := "/var/log/go/application.log"
+
+	// ディレクトリの存在を確認（存在しなければ作成）
+	if _, err := os.Stat("/var/log/go"); os.IsNotExist(err) {
+		err := os.MkdirAll("/var/log/go", 0755) // ディレクトリを再帰的に作成
+		if err != nil {
+			log.Fatalf("ディレクトリの作成に失敗: %v", err)
+		}
+	}
 	// ロガーの設定
-	logFile, err := os.OpenFile("application.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
