@@ -100,8 +100,11 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 				return
 			}
 
+			// リクエストペイロードをログに出力
+			fmt.Printf("Request Payload: %s\n", string(payloadBytes))
+
 			// タイムアウト設定付きのコンテキストを作成
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 
 			// メッセージをClaude APIに送信
@@ -114,6 +117,9 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 				responses[i] = gin.H{"error": err.Error()}
 				return
 			}
+
+			// Claude APIのレスポンスをログに出力
+			fmt.Printf("Claude API Response: %s\n", string(output.Body))
 
 			var claudeResp ClaudeResponse
 			err = json.Unmarshal(output.Body, &claudeResp)
