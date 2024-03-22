@@ -52,14 +52,23 @@ func HandleClaudeSummary(c *gin.Context) {
 	}
 	prompt += "\nAssistant:"
 
-	claudeInput := &bedrockruntime.InvokeModelInput{
-		Body:        []byte(`{"prompt":"` + prompt + `","max_tokens_to_sample":2048}`),
-		ModelId:     aws.String(claudeReq.Model),
-		ContentType: aws.String("application/json"),
+	payload := map[string]interface{}{
+		"prompt":               prompt,
+		"max_tokens_to_sample": 2048,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	// メッセージをClaude APIに送信
-	output, err := brc.InvokeModel(context.Background(), claudeInput)
+	output, err := brc.InvokeModel(context.Background(), &bedrockruntime.InvokeModelInput{
+		Body:        payloadBytes,
+		ModelId:     aws.String(claudeReq.Model),
+		ContentType: aws.String("application/json"),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
