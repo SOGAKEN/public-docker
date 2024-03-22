@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -98,8 +100,12 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 				return
 			}
 
+			// タイムアウト設定付きのコンテキストを作成
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
 			// メッセージをClaude APIに送信
-			output, err := brc.InvokeModel(context.Background(), &bedrockruntime.InvokeModelInput{
+			output, err := brc.InvokeModel(ctx, &bedrockruntime.InvokeModelInput{
 				Body:        payloadBytes,
 				ModelId:     aws.String(claudeReq.Model),
 				ContentType: aws.String("application/json"),
@@ -120,6 +126,10 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 				"summary": claudeResp.Summary,
 				"model":   claudeReq.Model,
 			}
+
+			// レスポンスの内容をログに出力
+			responseBytes, _ := json.Marshal(responses[i])
+			fmt.Printf("Response %d: %s\n", i, string(responseBytes))
 		}(i, v)
 	}
 
