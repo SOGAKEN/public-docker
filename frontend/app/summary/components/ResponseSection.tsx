@@ -31,7 +31,16 @@ const ResponseSection: React.FC<ResponseSectionProps> = ({ responses }) => {
 							<p>{response.google.content}</p>
 						</div>
 					)}
-
+					{response.claude && (
+						<div className="bg-gray-100 p-4 rounded-md">
+							<p className="text-lg font-semibold mb-2">Model:</p>
+							<p>{response.model}</p>
+							<p className="text-lg font-semibold mt-4 mb-2">
+								Content:
+							</p>
+							<p>{response.claude.content}</p>
+						</div>
+					)}
 					{/* Google and Azure response handling */}
 				</div>
 			))}

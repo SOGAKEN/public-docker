@@ -112,7 +112,7 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 
 	// APIリクエストの作成
 	message := bedrockruntime.InvokeModelInput{
-		ModelId: aws.String(claudeReq.Model),
+		ModelId: aws.String("anthropic." + claudeReq.Model),
 		Body: func() []byte {
 			payload := map[string]interface{}{
 				"max_tokens":        2048,

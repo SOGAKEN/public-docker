@@ -6,6 +6,7 @@ export type AIResponse = {
 export type Response = {
 	openai?: AIResponse;
 	google?: AIResponse;
+	claude?: AIResponse;
 	model?: string;
 	// Google and Azure response types
 };
