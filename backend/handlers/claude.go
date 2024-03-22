@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -47,22 +46,26 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 		return
 	}
 
-	for _, msg := range messages {
-		msgMap, ok := msg.(map[string]interface{})
-		if !ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
-			return
-		}
-
-		role := "Human"
-		content, contentOk := msgMap["content"].(string)
-		if !contentOk {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
-			return
-		}
-
-		claudeReq.Messages = append(claudeReq.Messages, Message{Role: role, Content: content})
+	if len(messages) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty messages in the request"})
+		return
 	}
+
+	msgMap, ok := messages[0].(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
+		return
+	}
+
+	content, contentOk := msgMap["content"].(string)
+	if !contentOk {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message format"})
+		return
+	}
+
+	summaryPrompt := "この文章を要約してください。結果のみ返してください：" + content
+
+	claudeReq.Messages = append(claudeReq.Messages, Message{Role: "Human", Content: summaryPrompt})
 
 	// AWS SDKの設定
 	cfg, err := config.LoadDefaultConfig(context.Background(),
@@ -98,9 +101,6 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 		return
 	}
 
-	// リクエストペイロードをログに出力
-	fmt.Printf("Request Payload: %s\n", string(payloadBytes))
-
 	// タイムアウト設定付きのコンテキストを作成
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -115,9 +115,6 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Claude APIのレスポンスをログに出力
-	fmt.Printf("Claude API Response: %s\n", string(output.Body))
 
 	var claudeResp ClaudeResponse
 	err = json.Unmarshal(output.Body, &claudeResp)
