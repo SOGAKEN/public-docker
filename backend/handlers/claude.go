@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -22,9 +21,23 @@ type ClaudeRequest struct {
 }
 
 type ClaudeResponse struct {
-	Completion string `json:"completion"`
-	StopReason string `json:"stop_reason"`
-	Stop       string `json:"stop"`
+	ID         string    `json:"id"`
+	Type       string    `json:"type"`
+	Role       string    `json:"role"`
+	Content    []Content `json:"content"`
+	Model      string    `json:"model"`
+	StopReason string    `json:"stop_reason"`
+	Usage      Usage     `json:"usage"`
+}
+
+type Content struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type Usage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 func HandleClaude(c *gin.Context, data []interface{}) {
@@ -72,7 +85,7 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 
 	combinedContent := strings.Join(contentParts, " ")
 
-	claudeReq.Messages = append(claudeReq.Messages, Message{Role: "Human", Content: combinedContent})
+	claudeReq.Messages = append(claudeReq.Messages, Message{Role: "user", Content: combinedContent})
 
 	// AWS SDKの設定
 	cfg, err := config.LoadDefaultConfig(context.Background(),
@@ -91,43 +104,37 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 	// AWS Bedrockランタイムのクライアントを初期化
 	brc := bedrockruntime.NewFromConfig(cfg)
 
-	prompt := ""
-	for _, msg := range claudeReq.Messages {
-		prompt += "\n" + msg.Role + ": " + msg.Content
-	}
-	prompt += "\nAssistant:"
-
-	payload := map[string]interface{}{
-		"prompt":               prompt,
-		"max_tokens_to_sample": 2048,
+	// anthropic_versionを環境変数から取得
+	anthropicVersion := os.Getenv("ANTHROPIC_VERSION")
+	if anthropicVersion == "" {
+		anthropicVersion = "bedrock-2023-05-31" // デフォルト値
 	}
 
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// APIリクエストの作成
+	message := bedrockruntime.InvokeModelInput{
+		ModelId: aws.String(claudeReq.Model),
+		Body: func() []byte {
+			payload := map[string]interface{}{
+				"max_tokens":        2048,
+				"messages":          claudeReq.Messages,
+				"anthropic_version": anthropicVersion,
+			}
+			payloadBytes, _ := json.Marshal(payload)
+			return payloadBytes
+		}(),
+		ContentType: aws.String("application/json"),
 	}
-
-	// リクエストペイロードをログに出力
-	fmt.Printf("Request Payload: %s\n", string(payloadBytes))
 
 	// タイムアウト設定付きのコンテキストを作成
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// メッセージをClaude APIに送信
-	output, err := brc.InvokeModel(ctx, &bedrockruntime.InvokeModelInput{
-		Body:        payloadBytes,
-		ModelId:     aws.String(claudeReq.Model),
-		ContentType: aws.String("application/json"),
-	})
+	// APIリクエストの送信
+	output, err := brc.InvokeModel(ctx, &message)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Claude APIのレスポンスをログに出力
-	fmt.Printf("Claude API Response: %s\n", string(output.Body))
 
 	var claudeResp ClaudeResponse
 	err = json.Unmarshal(output.Body, &claudeResp)
@@ -139,8 +146,13 @@ func HandleClaude(c *gin.Context, data []interface{}) {
 	c.JSON(http.StatusOK, gin.H{
 		"model": claudeReq.Model,
 		"claude": gin.H{
-			"content": claudeResp.Completion,
-			"role":    "assistant",
+			"content": func() string {
+				if len(claudeResp.Content) > 0 {
+					return claudeResp.Content[0].Text
+				}
+				return ""
+			}(),
+			"role": "assistant",
 		},
 	})
 }
